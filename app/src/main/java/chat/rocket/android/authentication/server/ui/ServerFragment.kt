@@ -42,7 +42,13 @@ import kotlinx.android.synthetic.main.fragment_authentication_server.*
 import okhttp3.HttpUrl
 import javax.inject.Inject
 
-fun newInstance() = ServerFragment()
+fun newInstance(deepLinkInfo: LoginDeepLinkInfo? = null): ServerFragment {
+    val p =  Bundle()
+    p.putParcelable(DEEP_LINK_INFO , deepLinkInfo)
+    val serverFragment = ServerFragment()
+    serverFragment.arguments = p ;
+    return serverFragment
+}
 
 private const val DEEP_LINK_INFO = "DeepLinkInfo"
 
@@ -85,7 +91,9 @@ class ServerFragment : Fragment(), ServerView {
 
         deepLinkInfo?.let {
             it.url.toUri().host?.let { host -> text_server_url.hintContent = host }
-            presenter.deepLink(it)
+//            presenter.deepLink(it)
+            presenter.checkServer(it.url)
+
         }
 
         analyticsManager.logScreenView(ScreenViewEvent.Server)

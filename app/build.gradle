@@ -166,8 +166,13 @@ dependencies {
 
     implementation libraries.aVLoadingIndicatorView
 
-    implementation libraries.glide
+    implementation(libraries.glide) {
+        exclude group: "com.android.support", module: "glide"
+    }
     implementation libraries.glideTransformations
+    implementation(libraries.glideAnnotations) {
+        exclude group: "com.android.support", module: "annotations"
+    }
 
     implementation(libraries.jitsi) { transitive = true }
 

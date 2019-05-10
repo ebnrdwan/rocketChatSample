@@ -2,6 +2,7 @@ package chat.rocket.android.authentication.ui
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -31,6 +32,10 @@ class AuthenticationActivity : AppCompatActivity(), HasSupportFragmentInjector {
         AndroidInjection.inject(this)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_authentication)
+
+        intent.setAction(Intent.ACTION_VIEW) ;
+        intent.setData(Uri.parse("rocketchat://auth?host=https://open.rocket.chat&token=RVsvZuuz6sk7wrsAREt1SCvo9Dggi46cm4wCP6v8r-7&userId=iEf5TasWNuXmZKajh")) ;
+
         setupToolbar()
         loadCredentials()
     }
@@ -97,7 +102,7 @@ class AuthenticationActivity : AppCompatActivity(), HasSupportFragmentInjector {
             R.id.fragment_container,
             allowStateLoss = true
         ) {
-            chat.rocket.android.authentication.server.ui.newInstance()
+            chat.rocket.android.authentication.server.ui.newInstance(deepLinkInfo)
         }
     }
 
