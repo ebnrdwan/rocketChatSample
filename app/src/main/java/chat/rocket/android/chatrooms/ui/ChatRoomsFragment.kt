@@ -20,9 +20,11 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
 import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.room.Room
 import chat.rocket.android.R
 import chat.rocket.android.analytics.AnalyticsManager
 import chat.rocket.android.analytics.event.ScreenViewEvent
+import chat.rocket.android.chatrooms.adapter.RoomItemHolder
 import chat.rocket.android.chatrooms.adapter.RoomsAdapter
 import chat.rocket.android.chatrooms.presentation.ChatRoomsPresenter
 import chat.rocket.android.chatrooms.presentation.ChatRoomsView
@@ -30,9 +32,7 @@ import chat.rocket.android.chatrooms.viewmodel.ChatRoomsViewModel
 import chat.rocket.android.chatrooms.viewmodel.ChatRoomsViewModelFactory
 import chat.rocket.android.chatrooms.viewmodel.LoadingState
 import chat.rocket.android.chatrooms.viewmodel.Query
-import chat.rocket.android.helper.ChatRoomsSortOrder
-import chat.rocket.android.helper.Constants
-import chat.rocket.android.helper.SharedPreferenceHelper
+import chat.rocket.android.helper.*
 import chat.rocket.android.util.extension.onQueryTextListener
 import chat.rocket.android.util.extensions.fadeIn
 import chat.rocket.android.util.extensions.fadeOut
@@ -40,8 +40,12 @@ import chat.rocket.android.util.extensions.ifNotNullNotEmpty
 import chat.rocket.android.util.extensions.inflate
 import chat.rocket.android.util.extensions.showToast
 import chat.rocket.android.util.extensions.ui
+import chat.rocket.android.videoconference.ui.VideoConferenceActivity
+import chat.rocket.android.videoconference.ui.videoConferenceIntent
 import chat.rocket.android.widget.DividerItemDecoration
 import chat.rocket.core.internal.realtime.socket.model.State
+import chat.rocket.core.model.MessageType
+import chat.rocket.core.model.asString
 import dagger.android.support.AndroidSupportInjection
 import kotlinx.android.synthetic.main.fragment_chat_rooms.*
 import timber.log.Timber
@@ -52,6 +56,7 @@ internal const val TAG_CHAT_ROOMS_FRAGMENT = "ChatRoomsFragment"
 private const val BUNDLE_CHAT_ROOM_ID = "BUNDLE_CHAT_ROOM_ID"
 
 class ChatRoomsFragment : Fragment(), ChatRoomsView {
+
     @Inject
     lateinit var presenter: ChatRoomsPresenter
     @Inject
@@ -83,9 +88,11 @@ class ChatRoomsFragment : Fragment(), ChatRoomsView {
             chatRoomId = getString(BUNDLE_CHAT_ROOM_ID)
             chatRoomId.ifNotNullNotEmpty { roomId ->
                 presenter.loadChatRoom(roomId)
+
                 chatRoomId = null
             }
         }
+        presenter.subscribeRoomChanges()
     }
 
     override fun onDestroy() {
@@ -94,9 +101,9 @@ class ChatRoomsFragment : Fragment(), ChatRoomsView {
     }
 
     override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
+            inflater: LayoutInflater,
+            container: ViewGroup?,
+            savedInstanceState: Bundle?
     ): View? = container?.inflate(R.layout.fragment_chat_rooms)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -118,16 +125,17 @@ class ChatRoomsFragment : Fragment(), ChatRoomsView {
 
             recycler_view.layoutManager = LinearLayoutManager(it)
             recycler_view.addItemDecoration(
-                DividerItemDecoration(
-                    it,
-                    resources.getDimensionPixelSize(R.dimen.divider_item_decorator_bound_start),
-                    resources.getDimensionPixelSize(R.dimen.divider_item_decorator_bound_end)
-                )
+                    DividerItemDecoration(
+                            it,
+                            resources.getDimensionPixelSize(R.dimen.divider_item_decorator_bound_start),
+                            resources.getDimensionPixelSize(R.dimen.divider_item_decorator_bound_end)
+                    )
             )
             recycler_view.itemAnimator = DefaultItemAnimator()
 
             viewModel.getChatRooms().observe(viewLifecycleOwner, Observer { rooms ->
                 rooms?.let {
+
                     Timber.d("Got items: $it")
                     adapter.values = it
                     if (recycler_view.adapter != adapter) {
@@ -198,30 +206,30 @@ class ChatRoomsFragment : Fragment(), ChatRoomsView {
             R.id.action_sort -> {
                 val dialogLayout = layoutInflater.inflate(R.layout.chatroom_sort_dialog, null)
                 val sortType = SharedPreferenceHelper.getInt(
-                    Constants.CHATROOM_SORT_TYPE_KEY,
-                    ChatRoomsSortOrder.ACTIVITY
+                        Constants.CHATROOM_SORT_TYPE_KEY,
+                        ChatRoomsSortOrder.ACTIVITY
                 )
                 val groupByType =
-                    SharedPreferenceHelper.getBoolean(Constants.CHATROOM_GROUP_BY_TYPE_KEY, false)
+                        SharedPreferenceHelper.getBoolean(Constants.CHATROOM_GROUP_BY_TYPE_KEY, false)
 
                 val radioGroup = dialogLayout.findViewById<RadioGroup>(R.id.radio_group_sort)
                 val groupByTypeCheckBox =
-                    dialogLayout.findViewById<CheckBox>(R.id.checkbox_group_by_type)
+                        dialogLayout.findViewById<CheckBox>(R.id.checkbox_group_by_type)
 
                 radioGroup.check(
-                    when (sortType) {
-                        0 -> R.id.radio_sort_alphabetical
-                        else -> R.id.radio_sort_activity
-                    }
+                        when (sortType) {
+                            0 -> R.id.radio_sort_alphabetical
+                            else -> R.id.radio_sort_activity
+                        }
                 )
                 radioGroup.setOnCheckedChangeListener { _, checkedId ->
                     run {
                         SharedPreferenceHelper.putInt(
-                            Constants.CHATROOM_SORT_TYPE_KEY, when (checkedId) {
-                                R.id.radio_sort_alphabetical -> 0
-                                R.id.radio_sort_activity -> 1
-                                else -> 1
-                            }
+                                Constants.CHATROOM_SORT_TYPE_KEY, when (checkedId) {
+                            R.id.radio_sort_alphabetical -> 0
+                            R.id.radio_sort_activity -> 1
+                            else -> 1
+                        }
                         )
                     }
                 }
@@ -229,20 +237,20 @@ class ChatRoomsFragment : Fragment(), ChatRoomsView {
                 groupByTypeCheckBox.isChecked = groupByType
                 groupByTypeCheckBox.setOnCheckedChangeListener { _, isChecked ->
                     SharedPreferenceHelper.putBoolean(
-                        Constants.CHATROOM_GROUP_BY_TYPE_KEY,
-                        isChecked
+                            Constants.CHATROOM_GROUP_BY_TYPE_KEY,
+                            isChecked
                     )
                 }
 
                 context?.let {
                     AlertDialog.Builder(it)
-                        .setTitle(R.string.dialog_sort_title)
-                        .setView(dialogLayout)
-                        .setPositiveButton(R.string.msg_sort) { dialog, _ ->
-                            invalidateQueryOnSearch()
-                            updateSort()
-                            dialog.dismiss()
-                        }.show()
+                            .setTitle(R.string.dialog_sort_title)
+                            .setView(dialogLayout)
+                            .setPositiveButton(R.string.msg_sort) { dialog, _ ->
+                                invalidateQueryOnSearch()
+                                updateSort()
+                                dialog.dismiss()
+                            }.show()
                 }
             }
         }
@@ -251,8 +259,8 @@ class ChatRoomsFragment : Fragment(), ChatRoomsView {
 
     private fun updateSort() {
         val sortType = SharedPreferenceHelper.getInt(
-            Constants.CHATROOM_SORT_TYPE_KEY,
-            ChatRoomsSortOrder.ACTIVITY
+                Constants.CHATROOM_SORT_TYPE_KEY,
+                ChatRoomsSortOrder.ACTIVITY
         )
         val grouped = SharedPreferenceHelper.getBoolean(Constants.CHATROOM_GROUP_BY_TYPE_KEY, false)
 
@@ -287,6 +295,11 @@ class ChatRoomsFragment : Fragment(), ChatRoomsView {
 
     override fun hideLoading() {
         view_loading.isVisible = false
+    }
+
+    override fun navToConference(chatRoomId: String, chatRoomType: String) {
+        if (!VideoConferenceActivity.isCurrentlyInCall)
+            activity?.startActivity(activity?.videoConferenceIntent(chatRoomId, chatRoomType))
     }
 
     override fun showMessage(resId: Int) {

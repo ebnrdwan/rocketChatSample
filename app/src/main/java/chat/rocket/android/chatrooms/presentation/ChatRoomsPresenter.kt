@@ -23,7 +23,11 @@ import chat.rocket.common.model.roomTypeOf
 import chat.rocket.core.internal.realtime.createDirectMessage
 import chat.rocket.core.internal.rest.me
 import chat.rocket.core.internal.rest.show
-import kotlinx.coroutines.withTimeout
+import chat.rocket.core.model.Message
+import chat.rocket.core.model.Room
+import chat.rocket.core.model.asString
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Named
@@ -31,19 +35,20 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
 class ChatRoomsPresenter @Inject constructor(
-    private val view: ChatRoomsView,
-    private val strategy: CancelStrategy,
-    private val navigator: MainNavigator,
-    @Named("currentServer") private val currentServer: String,
-    private val dbManager: DatabaseManager,
-    manager: ConnectionManager,
-    private val localRepository: LocalRepository,
-    private val userHelper: UserHelper,
-    settingsRepository: SettingsRepository
+        private val view: ChatRoomsView,
+        private val strategy: CancelStrategy,
+        private val navigator: MainNavigator,
+        @Named("currentServer") private val currentServer: String,
+        private val dbManager: DatabaseManager,
+        var manager: ConnectionManager,
+        private val localRepository: LocalRepository,
+        private val userHelper: UserHelper,
+        settingsRepository: SettingsRepository
 ) {
     private val client = manager.client
     private val settings = settingsRepository.get(currentServer)
-
+   var lastMessageId :String=""
+    val roomMessagesChannel = Channel<Message>(Channel.CONFLATED)
     fun loadChatRoom(roomId: String) {
         launchUI(strategy) {
             view.showLoadingRoom("")
@@ -64,6 +69,37 @@ class ChatRoomsPresenter @Inject constructor(
         }
     }
 
+
+    fun subscribeRoomChanges() {
+//        GlobalScope.launch(Dispatchers.IO + strategy.jobs) {
+//            manager.subscribeRoomMessages("main_chat_rooms", roomMessagesChannel)
+//            for (room in roomMessagesChannel) {
+//                view.showMessage("got new room updates ${room.sender?.name} with ${room?.type?.asString()}")
+//            }
+//        }
+        subscribeMessages("main_chat_rooms")
+    }
+
+
+    private fun subscribeMessages(roomId: String) {
+        manager.subscribeRoomMessages(roomId, roomMessagesChannel)
+        GlobalScope.launch(Dispatchers.IO + strategy.jobs) {
+            for (message in roomMessagesChannel) {
+                Timber.d("New message for room ${message.roomId}")
+                view.showMessage("got new room updates ${message.sender?.name} with ${message?.type?.asString()}")
+                view.navToConference(message.roomId, "d")
+            }
+        }
+    }
+
+    fun disconnect() {
+        unsubscribeRoomChanges()
+    }
+
+    private fun unsubscribeRoomChanges() {
+        manager.removeRoomChannel("main_chat_rooms")
+    }
+
     fun loadChatRoom(chatRoom: RoomUiModel) {
         launchUI(strategy) {
             view.showLoadingRoom(chatRoom.name)
@@ -74,13 +110,13 @@ class ChatRoomsPresenter @Inject constructor(
                 } else {
                     with(chatRoom) {
                         val entity = ChatRoomEntity(
-                            id = id,
-                            subscriptionId = "",
-                            type = type.toString(),
-                            name = username ?: name.toString(),
-                            fullname = name.toString(),
-                            open = open,
-                            muted = muted
+                                id = id,
+                                subscriptionId = "",
+                                type = type.toString(),
+                                name = username ?: name.toString(),
+                                fullname = name.toString(),
+                                open = open,
+                                muted = muted
                         )
                         loadChatRoom(entity, false)
                     }
@@ -151,13 +187,13 @@ class ChatRoomsPresenter @Inject constructor(
         try {
             val myself = retryIO { client.me() }
             val user = User(
-                id = myself.id,
-                username = myself.username,
-                name = myself.name,
-                status = myself.status,
-                utcOffset = myself.utcOffset,
-                emails = null,
-                roles = myself.roles
+                    id = myself.id,
+                    username = myself.username,
+                    name = myself.name,
+                    status = myself.status,
+                    utcOffset = myself.utcOffset,
+                    emails = null,
+                    roles = myself.roles
             )
             localRepository.saveCurrentUser(url = currentServer, user = user)
         } catch (ex: RocketChatException) {

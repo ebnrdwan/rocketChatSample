@@ -22,7 +22,8 @@ fun Context.videoConferenceIntent(chatRoomId: String, chatRoomType: String): Int
 
 private const val INTENT_CHAT_ROOM_ID = "chat_room_id"
 private const val INTENT_CHAT_ROOM_TYPE = "chat_room_type"
-private const val TAG="conference_tag"
+private const val TAG = "conference_tag"
+
 class VideoConferenceActivity : FragmentActivity(), JitsiMeetActivityInterface, JitsiVideoConferenceView, JitsiMeetViewListener {
     override fun onConferenceJoined(p0: MutableMap<String, Any>?) {
 
@@ -50,6 +51,7 @@ class VideoConferenceActivity : FragmentActivity(), JitsiMeetActivityInterface, 
     override fun onCreate(savedInstanceState: Bundle?) {
         AndroidInjection.inject(this)
         super.onCreate(savedInstanceState)
+        isCurrentlyInCall = true
         view = JitsiMeetView(this)
         view?.listener = this
         chatRoomId = intent.getStringExtra(INTENT_CHAT_ROOM_ID)
@@ -103,7 +105,7 @@ class VideoConferenceActivity : FragmentActivity(), JitsiMeetActivityInterface, 
 
     override fun onDestroy() {
         super.onDestroy()
-
+        isCurrentlyInCall = false
         view!!.dispose()
         view = null
         JitsiMeetActivityDelegate.onHostDestroy(this)
@@ -117,10 +119,17 @@ class VideoConferenceActivity : FragmentActivity(), JitsiMeetActivityInterface, 
     override fun onResume() {
         super.onResume()
         JitsiMeetActivityDelegate.onHostResume(this)
+        isCurrentlyInCall = true
     }
 
     override fun onStop() {
         super.onStop()
         JitsiMeetActivityDelegate.onHostPause(this)
+        isCurrentlyInCall = false
+    }
+
+
+    companion object {
+        var isCurrentlyInCall = false
     }
 }

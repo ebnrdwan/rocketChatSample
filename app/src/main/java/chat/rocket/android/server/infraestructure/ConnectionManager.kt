@@ -20,12 +20,11 @@ import chat.rocket.core.internal.realtime.subscribeSubscriptions
 import chat.rocket.core.internal.realtime.subscribeUserData
 import chat.rocket.core.internal.realtime.unsubscribe
 import chat.rocket.core.internal.rest.chatRooms
-import chat.rocket.core.model.Message
-import chat.rocket.core.model.Myself
-import chat.rocket.core.model.Room
+import chat.rocket.core.model.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable.isActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
@@ -34,26 +33,26 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.selects.select
 import timber.log.Timber
+import java.lang.Exception
+import java.lang.IllegalArgumentException
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.coroutines.CoroutineContext
 
 class ConnectionManager(
-    internal val client: RocketChatClient,
-    private val dbManager: DatabaseManager
+        internal val client: RocketChatClient,
+        private val dbManager: DatabaseManager
 ) : CoroutineScope {
-    private var connectJob : Job? = null
+    private var connectJob: Job? = null
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.IO
 
     val statusLiveData = MutableLiveData<State>()
     private val statusChannelList = CopyOnWriteArrayList<Channel<State>>()
     private val statusChannel = Channel<State>(Channel.CONFLATED)
-
     private val roomMessagesChannels = LinkedHashMap<String, Channel<Message>>()
     private val userDataChannels = ArrayList<Channel<Myself>>()
     private val roomsChannels = LinkedHashMap<String, Channel<Room>>()
     private val subscriptionIdMap = HashMap<String, String>()
-
     private var subscriptionId: String? = null
     private var roomsId: String? = null
     private var userDataId: String? = null
@@ -122,7 +121,7 @@ class ConnectionManager(
 
         var totalBatchedUsers = 0
         val userActor = createBatchActor<User>(
-            activeUsersContext, parent = connectJob, maxSize = 500, maxTime = 1000
+                activeUsersContext, parent = connectJob, maxSize = 500, maxTime = 1000
         ) { users ->
             totalBatchedUsers += users.size
             Timber.d("Processing Users batch: ${users.size} - $totalBatchedUsers")
@@ -132,7 +131,7 @@ class ConnectionManager(
         }
 
         val roomsActor = createBatchActor<StreamMessage<BaseRoom>>(
-            roomsContext, parent = connectJob, maxSize = 10
+                roomsContext, parent = connectJob, maxSize = 10
         ) { batch ->
             Timber.d("processing Stream batch: ${batch.size} - $batch")
             dbManager.processChatRoomsBatch(batch)
@@ -149,15 +148,26 @@ class ConnectionManager(
         }
 
         val messagesActor = createBatchActor<Message>(
-            messagesContext, parent = connectJob, maxSize = 100, maxTime = 500
+                messagesContext, parent = connectJob, maxSize = 100, maxTime = 500
         ) { messages ->
             Timber.d("Processing Messages batch: ${messages.size}")
             dbManager.processMessagesBatch(messages.distinctBy { it.id })
 
             launch {
                 messages.forEach { message ->
-                    val channel = roomMessagesChannels[message.roomId]
-                    channel?.send(message)
+                    message.type?.let {
+                        if (message.type != null && message.type?.isValidCallType()!!) {
+                            val channel = roomMessagesChannels["main_chat_rooms"]
+                            channel?.send(message)
+                        } else {
+                            val channel = roomMessagesChannels[message.roomId]
+                            channel?.send(message)
+                        }
+                    } ?: run {
+                        val channel = roomMessagesChannels[message.roomId]
+                        channel?.send(message)
+                    }
+
                 }
             }
         }
@@ -293,11 +303,11 @@ class ConnectionManager(
     }
 
     private inline fun <T> createBatchActor(
-        context: CoroutineContext = Dispatchers.IO,
-        parent: Job? = null,
-        maxSize: Int = 100,
-        maxTime: Int = 500,
-        crossinline block: (List<T>) -> Unit
+            context: CoroutineContext = Dispatchers.IO,
+            parent: Job? = null,
+            maxSize: Int = 100,
+            maxTime: Int = 500,
+            crossinline block: (List<T>) -> Unit
     ): SendChannel<T> {
         return actor(context) {
             val batch = ArrayList<T>(maxSize)
@@ -337,7 +347,22 @@ private fun Long.orZero(): Long {
 }
 
 suspend fun ConnectionManager.chatRooms(timestamp: Long = 0, filterCustom: Boolean = true) =
-    client.chatRooms(timestamp, filterCustom)
+        client.chatRooms(timestamp, filterCustom)
 
 val ConnectionManager.state: State
     get() = client.state
+
+
+fun MessageType.isValidCallType(): Boolean {
+    return when (this) {
+        is MessageType.jitsiAudio,
+        is MessageType.jitsiVideo,
+        is MessageType.acceptJistsiAudio,
+        is MessageType.acceptJitsiVideo,
+        is MessageType.rejectCall,
+        is MessageType.endCall,
+        is MessageType.busy,
+        is MessageType.JitsiCallStarted -> true
+        else -> false
+    }
+}

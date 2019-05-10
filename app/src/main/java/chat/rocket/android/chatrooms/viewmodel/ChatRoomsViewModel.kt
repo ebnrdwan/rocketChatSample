@@ -17,6 +17,7 @@ import chat.rocket.common.util.ifNull
 import chat.rocket.core.internal.realtime.socket.model.State
 import chat.rocket.core.internal.rest.spotlight
 import chat.rocket.core.model.SpotlightResult
+import chat.rocket.core.model.asString
 import com.shopify.livedataktx.distinct
 import com.shopify.livedataktx.map
 import com.shopify.livedataktx.nonNull
@@ -105,6 +106,8 @@ class ChatRoomsViewModel(
             state
         }
     }
+
+
 
     private fun fetchRooms() {
         GlobalScope.launch {

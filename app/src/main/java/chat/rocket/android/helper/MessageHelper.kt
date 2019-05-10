@@ -8,6 +8,7 @@ import chat.rocket.android.server.domain.useRealName
 import chat.rocket.common.model.RoomType
 import chat.rocket.core.model.ChatRoom
 import chat.rocket.core.model.Message
+import chat.rocket.core.model.Room
 import javax.inject.Inject
 
 class MessageHelper @Inject constructor(
@@ -74,4 +75,18 @@ class MessageHelper @Inject constructor(
         private const val MESSAGE_ID = 4
         val PERMALINK_REGEX = "(?:__|[*#])|\\[(.+?)\\]\\(.+?//.+?/(.+)/(.+)\\?.*=(.*)\\)".toRegex()
     }
+}
+
+
+
+
+fun String.getRoomTypeSample(): String {
+
+            return when(this) {
+             RoomType.PRIVATE_GROUP-> "p"
+              RoomType.CHANNEL -> "c"
+                RoomType.DIRECT_MESSAGE-> "d"
+              RoomType.LIVECHAT-> "l"
+                else -> throw (IllegalArgumentException("undefined type"))
+            }
 }
