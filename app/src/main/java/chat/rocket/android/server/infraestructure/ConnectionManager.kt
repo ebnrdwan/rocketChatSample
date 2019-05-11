@@ -156,7 +156,7 @@ class ConnectionManager(
             launch {
                 messages.forEach { message ->
                     message.type?.let {
-                        if (message.type != null && message.type?.isValidCallType()!!) {
+                        if (message.type?.isValidCallType()!!) {
                             val channel = roomMessagesChannels["main_chat_rooms"]
                             channel?.send(message)
                         } else {
@@ -363,6 +363,15 @@ fun MessageType.isValidCallType(): Boolean {
         is MessageType.endCall,
         is MessageType.busy,
         is MessageType.JitsiCallStarted -> true
+        else -> false
+    }
+}
+
+fun MessageType.isNewCall(): Boolean {
+    return when (this) {
+        is MessageType.jitsiAudio,
+        is MessageType.JitsiCallStarted,
+        is MessageType.jitsiVideo -> true
         else -> false
     }
 }

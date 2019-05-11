@@ -33,6 +33,7 @@ import chat.rocket.android.chatrooms.viewmodel.ChatRoomsViewModelFactory
 import chat.rocket.android.chatrooms.viewmodel.LoadingState
 import chat.rocket.android.chatrooms.viewmodel.Query
 import chat.rocket.android.helper.*
+import chat.rocket.android.server.infraestructure.isNewCall
 import chat.rocket.android.util.extension.onQueryTextListener
 import chat.rocket.android.util.extensions.fadeIn
 import chat.rocket.android.util.extensions.fadeOut
@@ -48,6 +49,7 @@ import chat.rocket.core.model.MessageType
 import chat.rocket.core.model.asString
 import dagger.android.support.AndroidSupportInjection
 import kotlinx.android.synthetic.main.fragment_chat_rooms.*
+import org.greenrobot.eventbus.EventBus
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -297,9 +299,13 @@ class ChatRoomsFragment : Fragment(), ChatRoomsView {
         view_loading.isVisible = false
     }
 
-    override fun navToConference(chatRoomId: String, chatRoomType: String) {
-        if (!VideoConferenceActivity.isCurrentlyInCall)
-            activity?.startActivity(activity?.videoConferenceIntent(chatRoomId, chatRoomType))
+    override fun navToConference(chatRoomId: String, chatRoomType: String, messageType: MessageType) {
+        if (messageType.isNewCall()){
+            if (!VideoConferenceActivity.isCurrentlyInCall)
+                activity?.startActivity(activity?.videoConferenceIntent(chatRoomId, chatRoomType))
+            else presenter.sendMessageWithType(chatRoomId,MessageType.busy())
+        }else EventBus.getDefault().post(messageType)
+
     }
 
     override fun showMessage(resId: Int) {

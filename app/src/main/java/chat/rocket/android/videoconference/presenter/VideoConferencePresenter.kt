@@ -11,7 +11,10 @@ import chat.rocket.android.util.extension.launchUI
 import chat.rocket.common.model.RoomType
 import chat.rocket.common.model.roomTypeOf
 import chat.rocket.core.RocketChatClient
+import chat.rocket.core.internal.rest.sendMessageWithType
 import chat.rocket.core.internal.rest.updateJitsiTimeout
+import chat.rocket.core.model.MessageType
+import chat.rocket.core.model.asString
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -21,13 +24,13 @@ import javax.inject.Inject
 import kotlin.concurrent.timer
 
 class VideoConferencePresenter @Inject constructor(
-    private val view: JitsiVideoConferenceView,
-    private val strategy: CancelStrategy,
-    private val currentServerRepository: CurrentServerRepository,
-    private val connectionManagerFactory: ConnectionManagerFactory,
-    private val settings: GetSettingsInteractor,
-    private val userHelp: UserHelper,
-    private val analyticsManager: AnalyticsManager
+        private val view: JitsiVideoConferenceView,
+        private val strategy: CancelStrategy,
+        private val currentServerRepository: CurrentServerRepository,
+        private val connectionManagerFactory: ConnectionManagerFactory,
+        private val settings: GetSettingsInteractor,
+        private val userHelp: UserHelper,
+        private val analyticsManager: AnalyticsManager
 ) {
     private lateinit var client: RocketChatClient
     private lateinit var publicSettings: PublicSettings
@@ -49,14 +52,14 @@ class VideoConferencePresenter @Inject constructor(
             try {
                 with(publicSettings) {
                     view.startJitsiVideoConference(
-                        JitsiHelper.getJitsiUrl(
-                            isJitsiSSL(),
-                            jitsiDomain(),
-                            jitsiPrefix(),
-                            uniqueIdentifier(),
-                            chatRoomId
-                        ),
-                        userHelp.user()?.username
+                            JitsiHelper.getJitsiUrl(
+                                    isJitsiSSL(),
+                                    jitsiDomain(),
+                                    jitsiPrefix(),
+                                    uniqueIdentifier(),
+                                    chatRoomId
+                            ),
+                            userHelp.user()?.username
                     )
 
                     updateJitsiTimeout()
@@ -70,6 +73,14 @@ class VideoConferencePresenter @Inject constructor(
     }
 
     fun invalidateTimer() = timer.cancel()
+    fun sendMessageWithType(chatRoomId: String, messageType: MessageType) {
+        launchUI(strategy) {
+
+            val id = UUID.randomUUID().toString()
+            client.sendMessageWithType(messageId = id, roomId = chatRoomId, message = "call", messageType = messageType.asString())
+
+        }
+    }
 
     // Jitsi update call needs to be called every 10 seconds to make sure call is not ended and is available to web users.
     private fun updateJitsiTimeout() {

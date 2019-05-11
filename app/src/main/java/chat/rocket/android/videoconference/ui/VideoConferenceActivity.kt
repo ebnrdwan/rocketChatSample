@@ -11,8 +11,13 @@ import java.net.URL
 import javax.inject.Inject
 import android.util.Log
 import androidx.fragment.app.FragmentActivity
+import chat.rocket.android.util.extensions.showToast
+import chat.rocket.core.model.MessageType
 import com.facebook.react.modules.core.PermissionListener
+import org.greenrobot.eventbus.EventBus
+import org.greenrobot.eventbus.Subscribe
 import org.jitsi.meet.sdk.*
+import org.greenrobot.eventbus.ThreadMode
 
 
 fun Context.videoConferenceIntent(chatRoomId: String, chatRoomType: String): Intent =
@@ -51,6 +56,7 @@ class VideoConferenceActivity : FragmentActivity(), JitsiMeetActivityInterface, 
     override fun onCreate(savedInstanceState: Bundle?) {
         AndroidInjection.inject(this)
         super.onCreate(savedInstanceState)
+
         isCurrentlyInCall = true
         view = JitsiMeetView(this)
         view?.listener = this
@@ -68,6 +74,11 @@ class VideoConferenceActivity : FragmentActivity(), JitsiMeetActivityInterface, 
         finishJitsiVideoConference()
     }
 
+
+    override fun onStart() {
+        super.onStart()
+        EventBus.getDefault().register(this);
+    }
 
     override fun startJitsiVideoConference(url: String, name: String?) {
         val splits = url.split("t/")
@@ -94,8 +105,7 @@ class VideoConferenceActivity : FragmentActivity(), JitsiMeetActivityInterface, 
     }
 
     override fun finishJitsiVideoConference() {
-        presenter.invalidateTimer()
-        view?.dispose()
+        presenter.sendMessageWithType(chatRoomId, MessageType.endCall())
         finish()
     }
 
@@ -105,10 +115,12 @@ class VideoConferenceActivity : FragmentActivity(), JitsiMeetActivityInterface, 
 
     override fun onDestroy() {
         super.onDestroy()
+        JitsiMeetActivityDelegate.onHostDestroy(this)
+        presenter.invalidateTimer()
         isCurrentlyInCall = false
         view!!.dispose()
         view = null
-        JitsiMeetActivityDelegate.onHostDestroy(this)
+
     }
 
     public override fun onNewIntent(intent: Intent) {
@@ -126,6 +138,14 @@ class VideoConferenceActivity : FragmentActivity(), JitsiMeetActivityInterface, 
         super.onStop()
         JitsiMeetActivityDelegate.onHostPause(this)
         isCurrentlyInCall = false
+        EventBus.getDefault().unregister(this);
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    fun onMessageEvent(event: MessageType) {
+        when (event) {
+            is MessageType.endCall -> finish()
+        }
     }
 
 

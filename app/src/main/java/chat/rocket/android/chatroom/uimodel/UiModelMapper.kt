@@ -54,16 +54,16 @@ import javax.inject.Inject
 
 @PerFragment
 class UiModelMapper @Inject constructor(
-    private val context: Context,
-    private val parser: MessageParser,
-    private val dbManager: DatabaseManager,
-    private val messageHelper: MessageHelper,
-    private val userHelper: UserHelper,
-    tokenRepository: TokenRepository,
-    serverInteractor: GetCurrentServerInteractor,
-    getSettingsInteractor: GetSettingsInteractor,
-    localRepository: LocalRepository,
-    factory: ConnectionManagerFactory
+        private val context: Context,
+        private val parser: MessageParser,
+        private val dbManager: DatabaseManager,
+        private val messageHelper: MessageHelper,
+        private val userHelper: UserHelper,
+        tokenRepository: TokenRepository,
+        serverInteractor: GetCurrentServerInteractor,
+        getSettingsInteractor: GetSettingsInteractor,
+        localRepository: LocalRepository,
+        factory: ConnectionManagerFactory
 ) {
 
     private val currentServer = serverInteractor.get()!!
@@ -76,127 +76,127 @@ class UiModelMapper @Inject constructor(
     private val secondaryTextColor = ContextCompat.getColor(context, R.color.colorSecondaryText)
 
     suspend fun map(
-        message: Message,
-        roomUiModel: RoomUiModel = RoomUiModel(roles = emptyList(), isBroadcast = true)
+            message: Message,
+            roomUiModel: RoomUiModel = RoomUiModel(roles = emptyList(), isBroadcast = true)
     ): List<BaseUiModel<*>> =
-        withContext(Dispatchers.IO) {
-            return@withContext translate(message, roomUiModel)
-        }
-
-    suspend fun map(
-        messages: List<Message>,
-        roomUiModel: RoomUiModel = RoomUiModel(roles = emptyList(), isBroadcast = true),
-        asNotReversed: Boolean = false
-    ): List<BaseUiModel<*>> =
-        withContext(Dispatchers.IO) {
-            val list = ArrayList<BaseUiModel<*>>(messages.size)
-
-            messages.forEach {
-                list.addAll(
-                    if (asNotReversed) translateAsNotReversed(it, roomUiModel)
-                    else translate(it, roomUiModel)
-                )
+            withContext(Dispatchers.IO) {
+                return@withContext translate(message, roomUiModel)
             }
-            return@withContext list
-        }
 
     suspend fun map(
-        readReceipts: List<ReadReceipt>
+            messages: List<Message>,
+            roomUiModel: RoomUiModel = RoomUiModel(roles = emptyList(), isBroadcast = true),
+            asNotReversed: Boolean = false
+    ): List<BaseUiModel<*>> =
+            withContext(Dispatchers.IO) {
+                val list = ArrayList<BaseUiModel<*>>(messages.size)
+
+                messages.forEach {
+                    list.addAll(
+                            if (asNotReversed) translateAsNotReversed(it, roomUiModel)
+                            else translate(it, roomUiModel)
+                    )
+                }
+                return@withContext list
+            }
+
+    suspend fun map(
+            readReceipts: List<ReadReceipt>
     ): List<ReadReceiptViewModel> = withContext(Dispatchers.IO) {
         val list = arrayListOf<ReadReceiptViewModel>()
 
         readReceipts.forEach {
             list.add(
-                ReadReceiptViewModel(
-                    avatar = baseUrl.avatarUrl(it.user.username ?: ""),
-                    name = userHelper.displayName(it.user),
-                    time = DateTimeHelper.getTime(DateTimeHelper.getLocalDateTime(it.timestamp))
-                )
+                    ReadReceiptViewModel(
+                            avatar = baseUrl.avatarUrl(it.user.username ?: ""),
+                            name = userHelper.displayName(it.user),
+                            time = DateTimeHelper.getTime(DateTimeHelper.getLocalDateTime(it.timestamp))
+                    )
             )
         }
         return@withContext list
     }
 
     private suspend fun translate(
-        message: Message,
-        roomUiModel: RoomUiModel
+            message: Message,
+            roomUiModel: RoomUiModel
     ): List<BaseUiModel<*>> =
-        withContext(Dispatchers.IO) {
-            val list = ArrayList<BaseUiModel<*>>()
+            withContext(Dispatchers.IO) {
+                val list = ArrayList<BaseUiModel<*>>()
 
-            getChatRoomAsync(message.roomId)?.let { chatRoom ->
-                message.urls?.forEach { url ->
-                    if (url.url.isImage()) {
-                        val attachment = Attachment(imageUrl = url.url)
-                        mapAttachment(message, attachment, chatRoom)?.let { list.add(it) }
-                    } else {
-                        mapUrl(message, url, chatRoom)?.let { list.add(it) }
-                    }
-                }
-
-                message.attachments?.mapNotNull { attachment ->
-                    mapAttachment(message, attachment, chatRoom)
-                }?.asReversed()?.let {
-                    list.addAll(it)
-                }
-
-                mapMessage(message, chatRoom).let {
-                    if (list.isNotEmpty()) {
-                        it.preview = list.first().preview
-                    }
-                    list.add(it)
-                }
-            }
-
-
-            for (i in list.size - 1 downTo 0) {
-                val next = if (i - 1 < 0) null else list[i - 1]
-                list[i].nextDownStreamMessage = next
-                mapVisibleActions(list[i])
-            }
-
-            if (isBroadcastReplyAvailable(roomUiModel, message)) {
                 getChatRoomAsync(message.roomId)?.let { chatRoom ->
-                    val replyUiModel = mapMessageReply(message, chatRoom)
-                    list.first().nextDownStreamMessage = replyUiModel
-                    list.add(0, replyUiModel)
-                }
-            }
+                    message.urls?.forEach { url ->
+                        if (url.url.isImage()) {
+                            val attachment = Attachment(imageUrl = url.url)
+                            mapAttachment(message, attachment, chatRoom)?.let { list.add(it) }
+                        } else {
+                            mapUrl(message, url, chatRoom)?.let { list.add(it) }
+                        }
+                    }
 
-            return@withContext list
-        }
+                    message.attachments?.mapNotNull { attachment ->
+                        mapAttachment(message, attachment, chatRoom)
+                    }?.asReversed()?.let {
+                        list.addAll(it)
+                    }
+
+                    mapMessage(message, chatRoom).let {
+                        if (list.isNotEmpty()) {
+                            it.preview = list.first().preview
+                        }
+                        list.add(it)
+                    }
+                }
+
+
+                for (i in list.size - 1 downTo 0) {
+                    val next = if (i - 1 < 0) null else list[i - 1]
+                    list[i].nextDownStreamMessage = next
+                    mapVisibleActions(list[i])
+                }
+
+                if (isBroadcastReplyAvailable(roomUiModel, message)) {
+                    getChatRoomAsync(message.roomId)?.let { chatRoom ->
+                        val replyUiModel = mapMessageReply(message, chatRoom)
+                        list.first().nextDownStreamMessage = replyUiModel
+                        list.add(0, replyUiModel)
+                    }
+                }
+
+                return@withContext list
+            }
 
     // TODO: move this to new interactor or FetchChatRoomsInteractor?
     private suspend fun getChatRoomAsync(roomId: String): ChatRoom? = withContext(Dispatchers.IO) {
         return@withContext dbManager.getRoom(id = roomId)?.let {
             with(it.chatRoom) {
                 ChatRoom(
-                    id = id,
-                    subscriptionId = subscriptionId,
-                    type = roomTypeOf(type),
-                    unread = unread,
-                    broadcast = broadcast ?: false,
-                    alert = alert,
-                    fullName = fullname,
-                    name = name,
-                    favorite = favorite ?: false,
-                    default = isDefault ?: false,
-                    readonly = readonly,
-                    open = open,
-                    lastMessage = null,
-                    archived = false,
-                    status = null,
-                    user = null,
-                    userMentions = userMentions,
-                    client = client,
-                    announcement = null,
-                    description = null,
-                    groupMentions = groupMentions,
-                    roles = null,
-                    topic = null,
-                    lastSeen = this.lastSeen,
-                    timestamp = timestamp,
-                    updatedAt = updatedAt
+                        id = id,
+                        subscriptionId = subscriptionId,
+                        type = roomTypeOf(type),
+                        unread = unread,
+                        broadcast = broadcast ?: false,
+                        alert = alert,
+                        fullName = fullname,
+                        name = name,
+                        favorite = favorite ?: false,
+                        default = isDefault ?: false,
+                        readonly = readonly,
+                        open = open,
+                        lastMessage = null,
+                        archived = false,
+                        status = null,
+                        user = null,
+                        userMentions = userMentions,
+                        client = client,
+                        announcement = null,
+                        description = null,
+                        groupMentions = groupMentions,
+                        roles = null,
+                        topic = null,
+                        lastSeen = this.lastSeen,
+                        timestamp = timestamp,
+                        updatedAt = updatedAt
                 )
             }
         }
@@ -209,85 +209,85 @@ class UiModelMapper @Inject constructor(
     }
 
     private suspend fun translateAsNotReversed(
-        message: Message,
-        roomUiModel: RoomUiModel
+            message: Message,
+            roomUiModel: RoomUiModel
     ): List<BaseUiModel<*>> =
-        withContext(Dispatchers.IO) {
-            val list = ArrayList<BaseUiModel<*>>()
+            withContext(Dispatchers.IO) {
+                val list = ArrayList<BaseUiModel<*>>()
 
-            getChatRoomAsync(message.roomId)?.let { chatRoom ->
-                mapMessage(message, chatRoom).let {
-                    if (list.isNotEmpty()) {
-                        it.preview = list.first().preview
-                    }
-                    list.add(it)
-                }
-
-                message.attachments?.forEach {
-                    val attachment = mapAttachment(message, it, chatRoom)
-                    attachment?.let {
-                        list.add(attachment)
-                    }
-                }
-
-                message.urls?.forEach {
-                    val url = mapUrl(message, it, chatRoom)
-                    url?.let {
-                        list.add(url)
-                    }
-                }
-            }
-
-            for (i in list.size - 1 downTo 0) {
-                val next = if (i - 1 < 0) null else list[i - 1]
-                list[i].nextDownStreamMessage = next
-            }
-
-            if (isBroadcastReplyAvailable(roomUiModel, message)) {
                 getChatRoomAsync(message.roomId)?.let { chatRoom ->
-                    val replyUiModel = mapMessageReply(message, chatRoom)
-                    list.first().nextDownStreamMessage = replyUiModel
-                    list.add(0, replyUiModel)
+                    mapMessage(message, chatRoom).let {
+                        if (list.isNotEmpty()) {
+                            it.preview = list.first().preview
+                        }
+                        list.add(it)
+                    }
+
+                    message.attachments?.forEach {
+                        val attachment = mapAttachment(message, it, chatRoom)
+                        attachment?.let {
+                            list.add(attachment)
+                        }
+                    }
+
+                    message.urls?.forEach {
+                        val url = mapUrl(message, it, chatRoom)
+                        url?.let {
+                            list.add(url)
+                        }
+                    }
                 }
-            }
 
-            list.dropLast(1).forEach {
-                it.reactions = emptyList()
-            }
-            list.last().reactions = getReactions(message)
-            list.last().nextDownStreamMessage = null
+                for (i in list.size - 1 downTo 0) {
+                    val next = if (i - 1 < 0) null else list[i - 1]
+                    list[i].nextDownStreamMessage = next
+                }
 
-            return@withContext list
-        }
+                if (isBroadcastReplyAvailable(roomUiModel, message)) {
+                    getChatRoomAsync(message.roomId)?.let { chatRoom ->
+                        val replyUiModel = mapMessageReply(message, chatRoom)
+                        list.first().nextDownStreamMessage = replyUiModel
+                        list.add(0, replyUiModel)
+                    }
+                }
+
+                list.dropLast(1).forEach {
+                    it.reactions = emptyList()
+                }
+                list.last().reactions = getReactions(message)
+                list.last().nextDownStreamMessage = null
+
+                return@withContext list
+            }
 
     private fun isBroadcastReplyAvailable(roomUiModel: RoomUiModel, message: Message): Boolean {
         val senderUsername = message.sender?.username
         return roomUiModel.isRoom && roomUiModel.isBroadcast &&
-            !message.isSystemMessage() &&
-            senderUsername != currentUsername
+                !message.isSystemMessage() &&
+                senderUsername != currentUsername
     }
 
     private fun mapMessageReply(message: Message, chatRoom: ChatRoom): MessageReplyUiModel {
         val name = message.sender?.name
         val roomName =
-            if (settings.useRealName() && name != null) name else message.sender?.username ?: ""
+                if (settings.useRealName() && name != null) name else message.sender?.username ?: ""
         val permalink = messageHelper.createPermalink(message, chatRoom)
 
         val localDateTime = DateTimeHelper.getLocalDateTime(message.timestamp)
         val dayMarkerText = DateTimeHelper.getFormattedDateForMessages(localDateTime, context)
 
         return MessageReplyUiModel(
-            messageId = message.id,
-            isTemporary = false,
-            reactions = emptyList(),
-            message = message,
-            preview = mapMessagePreview(message),
-            rawData = MessageReply(roomName = roomName, permalink = permalink),
-            nextDownStreamMessage = null,
-            unread = message.unread,
-            currentDayMarkerText = dayMarkerText,
-            showDayMarker = false,
-            permalink = messageHelper.createPermalink(message, chatRoom, false)
+                messageId = message.id,
+                isTemporary = false,
+                reactions = emptyList(),
+                message = message,
+                preview = mapMessagePreview(message),
+                rawData = MessageReply(roomName = roomName, permalink = permalink),
+                nextDownStreamMessage = null,
+                unread = message.unread,
+                currentDayMarkerText = dayMarkerText,
+                showDayMarker = false,
+                permalink = messageHelper.createPermalink(message, chatRoom, false)
         )
     }
 
@@ -304,8 +304,8 @@ class UiModelMapper @Inject constructor(
         val permalink = messageHelper.createPermalink(message, chatRoom, false)
 
         return UrlPreviewUiModel(message, url, message.id, title, hostname, description, thumb,
-            getReactions(message), preview = message.copy(message = url.url), unread = message.unread,
-            showDayMarker = false, currentDayMarkerText = dayMarkerText, permalink = permalink)
+                getReactions(message), preview = message.copy(message = url.url), unread = message.unread,
+                showDayMarker = false, currentDayMarkerText = dayMarkerText, permalink = permalink)
     }
 
     private fun mapAttachment(message: Message, attachment: Attachment, chatRoom: ChatRoom): BaseUiModel<*>? {
@@ -332,34 +332,34 @@ class UiModelMapper @Inject constructor(
             val attachmentDescription = attachmentDescription(attachment)
 
             AttachmentUiModel(
-                message = message,
-                rawData = this,
-                messageId = message.id,
-                reactions = getReactions(message),
-                preview = message.copy(message = content.message),
-                isTemporary = !message.synced,
-                unread = message.unread,
-                currentDayMarkerText = dayMarkerText,
-                showDayMarker = false,
-                permalink = permalink,
-                id = id,
-                title = attachmentTitle,
-                description = attachmentDescription,
-                authorName = attachmentAuthor,
-                text = attachmentText,
-                color = color?.color,
-                imageUrl = imageUrl,
-                videoUrl = videoUrl,
-                audioUrl = audioUrl,
-                titleLink = titleLink,
-                type = type,
-                messageLink = messageLink,
-                timestamp = time,
-                authorIcon = authorIcon,
-                authorLink = authorLink,
-                fields = fieldsText,
-                buttonAlignment = buttonAlignment,
-                actions = actions
+                    message = message,
+                    rawData = this,
+                    messageId = message.id,
+                    reactions = getReactions(message),
+                    preview = message.copy(message = content.message),
+                    isTemporary = !message.synced,
+                    unread = message.unread,
+                    currentDayMarkerText = dayMarkerText,
+                    showDayMarker = false,
+                    permalink = permalink,
+                    id = id,
+                    title = attachmentTitle,
+                    description = attachmentDescription,
+                    authorName = attachmentAuthor,
+                    text = attachmentText,
+                    color = color?.color,
+                    imageUrl = imageUrl,
+                    videoUrl = videoUrl,
+                    audioUrl = audioUrl,
+                    titleLink = titleLink,
+                    type = type,
+                    messageLink = messageLink,
+                    timestamp = time,
+                    authorIcon = authorIcon,
+                    authorLink = authorLink,
+                    fields = fieldsText,
+                    buttonAlignment = buttonAlignment,
+                    actions = actions
             )
         }
     }
@@ -435,8 +435,8 @@ class UiModelMapper @Inject constructor(
     }
 
     private suspend fun mapMessage(
-        message: Message,
-        chatRoom: ChatRoom
+            message: Message,
+            chatRoom: ChatRoom
     ): MessageUiModel = withContext(Dispatchers.IO) {
         val sender = getSenderName(message)
         val time = getTime(message.timestamp)
@@ -455,11 +455,11 @@ class UiModelMapper @Inject constructor(
 
         val content = getContent(stripMessageQuotes(message))
         MessageUiModel(message = stripMessageQuotes(message), rawData = message,
-            messageId = message.id, avatar = avatar!!, time = time, senderName = sender,
-            content = content, isPinned = message.pinned, currentDayMarkerText = dayMarkerText,
-            showDayMarker = false, reactions = getReactions(message), isFirstUnread = false,
-            preview = preview, isTemporary = !synced, unread = unread, permalink = permalink,
-            subscriptionId = chatRoom.subscriptionId)
+                messageId = message.id, avatar = avatar!!, time = time, senderName = sender,
+                content = content, isPinned = message.pinned, currentDayMarkerText = dayMarkerText,
+                showDayMarker = false, reactions = getReactions(message), isFirstUnread = false,
+                preview = preview, isTemporary = !synced, unread = unread, permalink = permalink,
+                subscriptionId = chatRoom.subscriptionId)
     }
 
     private fun mapMessagePreview(message: Message): Message = when (message.isSystemMessage()) {
@@ -476,13 +476,13 @@ class UiModelMapper @Inject constructor(
                 val count = usernames.size
                 val custom = customEmojis.firstOrNull { emoji -> emoji.shortname == shortname }
                 list.add(
-                    ReactionUiModel(messageId = message.id,
-                        shortname = shortname,
-                        unicode = EmojiParser.parse(context, shortname),
-                        count = count,
-                        usernames = usernames,
-                        url = custom?.url,
-                        isCustom = custom != null)
+                        ReactionUiModel(messageId = message.id,
+                                shortname = shortname,
+                                unicode = EmojiParser.parse(context, shortname),
+                                count = count,
+                                usernames = usernames,
+                                url = custom?.url,
+                                isCustom = custom != null)
                 )
             }
             list
@@ -493,7 +493,7 @@ class UiModelMapper @Inject constructor(
     private fun stripMessageQuotes(message: Message): Message {
         val baseUrl = settings.baseUrl()
         return message.copy(
-            message = message.message.replace("\\[[^\\]]+\\]\\($baseUrl[^)]+\\)".toRegex(), "").trim()
+                message = message.message.replace("\\[[^\\]]+\\]\\($baseUrl[^)]+\\)".toRegex(), "").trim()
         )
     }
 
@@ -552,9 +552,13 @@ class UiModelMapper @Inject constructor(
                 is MessageType.SubscriptionRoleAdded -> getString(R.string.message_role_add, message.message, message.role, message.sender?.username)
                 is MessageType.SubscriptionRoleRemoved -> getString(R.string.message_role_removed, message.message, message.role, message.sender?.username)
                 is MessageType.RoomChangedPrivacy -> getString(R.string.message_room_changed_privacy, message.message, message.sender?.username)
-                is MessageType.JitsiCallStarted -> context.getString(
-                    R.string.message_video_call_started, message.sender?.username
-                )
+                is MessageType.JitsiCallStarted -> context.getString(R.string.message_video_call_started, message.sender?.username)
+                is MessageType.jitsiVideo -> context.getString(R.string.message_video_call_started, message.sender?.username)
+                is MessageType.jitsiAudio -> context.getString(R.string.message_video_call_started, message.sender?.username)
+                is MessageType.endCall -> context.getString(R.string.message_video_call_started, message.sender?.username)
+                is MessageType.busy -> context.getString(R.string.message_video_call_started, message.sender?.username)
+                is MessageType.acceptJitsiVideo -> context.getString(R.string.message_video_call_started, message.sender?.username)
+                is MessageType.acceptJistsiAudio -> context.getString(R.string.message_video_call_started, message.sender?.username)
                 else -> throw InvalidParameterException("Invalid message type: ${message.type}")
             }
         }

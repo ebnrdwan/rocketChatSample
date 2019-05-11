@@ -177,7 +177,7 @@ dependencies {
     implementation(libraries.jitsi) { transitive = true }
 
     implementation 'com.google.code.findbugs:jsr305:3.0.2'
-
+    implementation libraries.eventbus
     // Proprietary libraries
     playImplementation libraries.fcm
     playImplementation libraries.firebaseAnalytics
@@ -189,6 +189,7 @@ dependencies {
     testImplementation libraries.truth
     androidTestImplementation libraries.espressoCore
     androidTestImplementation libraries.espressoIntents
+
 }
 
 androidExtensions {

@@ -22,13 +22,16 @@ import chat.rocket.common.model.User
 import chat.rocket.common.model.roomTypeOf
 import chat.rocket.core.internal.realtime.createDirectMessage
 import chat.rocket.core.internal.rest.me
+import chat.rocket.core.internal.rest.sendMessageWithType
 import chat.rocket.core.internal.rest.show
 import chat.rocket.core.model.Message
+import chat.rocket.core.model.MessageType
 import chat.rocket.core.model.Room
 import chat.rocket.core.model.asString
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import timber.log.Timber
+import java.util.*
 import javax.inject.Inject
 import javax.inject.Named
 import kotlin.coroutines.resume
@@ -47,7 +50,7 @@ class ChatRoomsPresenter @Inject constructor(
 ) {
     private val client = manager.client
     private val settings = settingsRepository.get(currentServer)
-   var lastMessageId :String=""
+    var lastMessageId: String = ""
     val roomMessagesChannel = Channel<Message>(Channel.CONFLATED)
     fun loadChatRoom(roomId: String) {
         launchUI(strategy) {
@@ -86,9 +89,22 @@ class ChatRoomsPresenter @Inject constructor(
         GlobalScope.launch(Dispatchers.IO + strategy.jobs) {
             for (message in roomMessagesChannel) {
                 Timber.d("New message for room ${message.roomId}")
-                view.showMessage("got new room updates ${message.sender?.name} with ${message?.type?.asString()}")
-                view.navToConference(message.roomId, "d")
+
+                if (message.sender != null && message.sender?.username != userHelper.username()) {
+                    view.showMessage("got new room updates ${message.sender?.name} with ${message?.type?.asString()}")
+                    view.navToConference(message.roomId, "d", message.type!!)
+                } else           view.showMessage("me with ${message?.type?.asString()}")
+
             }
+        }
+    }
+
+    fun sendMessageWithType(chatRoomId: String, messageType: MessageType) {
+        launchUI(strategy) {
+
+            val id = UUID.randomUUID().toString()
+            client.sendMessageWithType(messageId = id, roomId = chatRoomId, message = "call", messageType = messageType.asString())
+
         }
     }
 
