@@ -6,6 +6,7 @@ import chat.rocket.android.util.retryDB
 import chat.rocket.common.model.SimpleRoom
 import chat.rocket.common.model.SimpleUser
 import chat.rocket.core.model.Message
+import chat.rocket.core.model.MessageType
 import chat.rocket.core.model.Reactions
 import chat.rocket.core.model.attachment.Attachment
 import chat.rocket.core.model.attachment.Color
@@ -26,6 +27,7 @@ class DatabaseMessageMapper(private val dbManager: DatabaseManager) {
 
     suspend fun map(messages: List<FullMessage>): List<Message> {
         val list = mutableListOf<Message>()
+
         messages.forEach { message ->
             val favorites = mutableListOf<SimpleUser>()
             message.favorites.forEach { user ->
@@ -52,7 +54,7 @@ class DatabaseMessageMapper(private val dbManager: DatabaseManager) {
                 val urls = this.urls?.let { mapUrl(it) }
                 val reactions = this.reactions?.let { mapReactions(it) }
                 val attachments = this.attachments?.let { mapAttachments(it).asReversed() }
-                val messageType = messageTypeOf(this.message.type)
+                val messageType = this.message.type?.let { messageTypeOf(it) }
 
                 list.add(
                     Message(
@@ -135,6 +137,34 @@ class DatabaseMessageMapper(private val dbManager: DatabaseManager) {
         }
     }
 
+
+    private fun messageTypeOf(type: String): MessageType {
+        return when (type) {
+            "r" -> MessageType.RoomNameChanged()
+            "au" -> MessageType.UserAdded()
+            "ru" -> MessageType.UserRemoved()
+            "uj" -> MessageType.UserJoined()
+            "ul" -> MessageType.UserLeft()
+            "wm" -> MessageType.Welcome()
+            "rm" -> MessageType.MessageRemoved()
+            "message_pinned" -> MessageType.MessagePinned()
+            "user-muted" -> MessageType.UserMuted()
+            "user-unmuted" -> MessageType.UserUnMuted()
+            "subscription-role-added" -> MessageType.SubscriptionRoleAdded()
+            "subscription-role-removed" -> MessageType.SubscriptionRoleAdded()
+            "room_changed_privacy" -> MessageType.RoomChangedPrivacy()
+            "jitsi_call_started" -> MessageType.JitsiCallStarted()
+            "jitsiAudio" -> MessageType.jitsiAudio()
+            "jitsiVideo" -> MessageType.jitsiVideo()
+            "acceptJistsiAudio" -> MessageType.acceptJistsiAudio()
+            "acceptJitsiVideo" -> MessageType.acceptJitsiVideo()
+            "rejectCall" -> MessageType.rejectCall()
+            "endCall" -> MessageType.endCall()
+            "busy" -> MessageType.busy()
+            else -> MessageType.Unspecified(type)
+        }
+
+    }
     private suspend fun mapAttachments(attachments: List<AttachmentEntity>): List<Attachment> {
         val list = mutableListOf<Attachment>()
         try {

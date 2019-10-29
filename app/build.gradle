@@ -180,6 +180,8 @@ dependencies {
     testImplementation libraries.truth
     androidTestImplementation libraries.espressoCore
     androidTestImplementation libraries.espressoIntents
+    implementation files('libraries\\common-0.1-SNAPSHOT.jar')
+    implementation files('libraries\\core-0.1-SNAPSHOT.jar')
 }
 
 androidExtensions {

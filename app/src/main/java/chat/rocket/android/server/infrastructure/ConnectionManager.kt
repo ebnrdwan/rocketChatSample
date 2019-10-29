@@ -12,21 +12,13 @@ import chat.rocket.core.internal.realtime.socket.model.State
 import chat.rocket.core.internal.realtime.socket.model.StreamMessage
 import chat.rocket.core.internal.realtime.socket.model.Type
 import chat.rocket.core.internal.realtime.subscribeActiveUsers
-import chat.rocket.core.internal.realtime.subscribeRoomMessages
 import chat.rocket.core.internal.realtime.subscribeRooms
 import chat.rocket.core.internal.realtime.subscribeSubscriptions
-import chat.rocket.core.internal.realtime.unsubscribe
-import chat.rocket.core.model.Message
 import chat.rocket.core.model.Room
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.selects.select
 import timber.log.Timber
 import java.util.concurrent.CopyOnWriteArrayList
@@ -54,7 +46,6 @@ class ConnectionManager(
             Timber.d("Already connected")
             return
         }
-
         // Cleanup first
         disconnect()
 
